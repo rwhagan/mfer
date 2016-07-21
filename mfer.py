@@ -9,6 +9,7 @@ import pandas as pd
 from pandas import DataFrame
 import argparse
 import subprocess
+import glob
 import os
 
 parser = argparse.ArgumentParser(description='This script formats and transposes OTU tables, merges them with metadata files, and performs categorical analyses. Usage: mfer.py -t otu_table -m metadata_file -n categorical_variable')
@@ -107,17 +108,20 @@ def filterR():
 		newDF = df.ix[(df['pval']<=userPval) & (df['fdr']<=userFDR)]
 		newDF.to_csv(args.significanceOutput, sep = '\t', index = False)
 	else:
-		for category in metadataHeaders:
-			df = pd.read_csv(category + "Compared.txt", sep = '\t')	
+		fileList = glob.glob('*Compared.txt')
+		for file in fileList:
+			print(file)
+			df = pd.read_csv(file, sep = "\t")
 			userPval = float(args.pval)
 			userFDR = float(args.fdr)
 			newDF = df.ix[(df['pval']<=userPval) & (df['fdr']<=userFDR)]
-			newDF.to_csv(category + "SigOut.txt", sep ='\t', index = False)
+			newDF.to_csv(file + "Sig.txt", sep = "\t", index = False)	
 
 prelimCheck()
 tableCheck()
 transpose(cleanedTable)
 merging()
+print(metadataHeaders)
 Rcomp()
 filterR()
 
