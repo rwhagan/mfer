@@ -3,4 +3,4 @@ A readme file
 
 Richard Hagan
 Allie
-Dave Jacobson
+Dave Jacobson August 6
