@@ -9,6 +9,7 @@ import pandas as pd
 from pandas import DataFrame
 import argparse
 import subprocess
+import glob
 import os
 
 parser = argparse.ArgumentParser(description='This script formats and transposes OTU tables, merges them with metadata files, and performs categorical analyses. Usage: mfer.py -t otu_table -m metadata_file -n categorical_variable')
@@ -95,22 +96,32 @@ def Rcomp():
 	else:
 		for category in metadataHeaders:
 			print(colors.RUN + 'Comparing groups, split by %s..' % category + colors.ENDC)
-			subprocess.call(args=['Rscript Compare.R %s %s %s' %(args.mergedOut, category, category + "compared.txt")], shell=True)
-			print(colors.COMPLETE + 'Complete! Output written to %s' % (category + "compared.txt") + colors.ENDC)	
+			subprocess.call(args=['Rscript Compare.R %s %s %s' %(args.mergedOut, category, category + "Compared.txt")], shell=True)
+			print(colors.COMPLETE + 'Complete! Output written to %s' % (category + "Compared.txt") + colors.ENDC)	
 	
 
 def filterR():
-	df =  pd.read_csv(args.compareOut, sep = '\t')
-	userPval = float(args.pval)
-	userFDR = float(args.fdr)
-	newDF = df.ix[(df['pval']<=userPval) & (df['fdr']<=userFDR)]
-	newDF.to_csv(args.significanceOutput, sep = '\t', index = False)
-
+	if args.categoryName:
+		df =  pd.read_csv(args.compareOut, sep = '\t')
+		userPval = float(args.pval)
+		userFDR = float(args.fdr)
+		newDF = df.ix[(df['pval']<=userPval) & (df['fdr']<=userFDR)]
+		newDF.to_csv(args.significanceOutput, sep = '\t', index = False)
+	else:
+		fileList = glob.glob('*Compared.txt')
+		for file in fileList:
+			print(file)
+			df = pd.read_csv(file, sep = "\t")
+			userPval = float(args.pval)
+			userFDR = float(args.fdr)
+			newDF = df.ix[(df['pval']<=userPval) & (df['fdr']<=userFDR)]
+			newDF.to_csv(file + "Sig.txt", sep = "\t", index = False)	
 
 prelimCheck()
 tableCheck()
 transpose(cleanedTable)
 merging()
+print(metadataHeaders)
 Rcomp()
 filterR()
 
