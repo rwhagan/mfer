@@ -1,6 +1,9 @@
 #!/usr/local/bin/python3
 
-#TO DO: create doc string
+'''This script formats and transposes OTU tables, merges them with metadata files, and performs categorical analyses. Usage: mfer.py -t otu_table -m metadata_file -n categorical_variable'''
+__author__ = "Richard Hagan, David Jacobson, Allison Mann, and Krithivasan Sankaranarayanan"
+__license__ = "GPL"
+__version__ = "1.0"
 
 import pandas as pd
 from pandas import DataFrame
@@ -8,22 +11,21 @@ import argparse
 import subprocess
 import os
 
-parser = argparse.ArgumentParser()
-#TO DO: parser = argparse.ArgumentParser(description='Program description here')
+parser = argparse.ArgumentParser(description='This script formats and transposes OTU tables, merges them with metadata files, and performs categorical analyses. Usage: mfer.py -t otu_table -m metadata_file -n categorical_variable')
 
-#required arguments
-parser.add_argument('-t', '--table', help="The table you wish to format", required=True,) 
+#Required arguments
+parser.add_argument('-t', '--table', help="The table you wish to format.", required=True)
 parser.add_argument('-m', '--metadata', help="The metadata file you wish to merge", required=True) 
-parser.add_argument('-n', '--categoryName', help='Metadata category used to compare taxa significance', required=True)
 
 #Optional arguments
+parser.add_argument('-n', '--categoryName', help='Metadata category used to compare taxa significance. Default is all categories')
 parser.add_argument('-c', '--collapsedOut', help='Desired collapsed OTU table name, default is collapsed_otu_table.txt', default='collapsed_otu_table.txt')
 parser.add_argument('-o', '--compareOut', help='Output file name for cateogry compare step, default is compareOut.txt', default='compareOut.txt')
 parser.add_argument('-v', '--mergedOut', help='Output file name for merged table step, default is mergedOut.txt', default='mergedOut.txt')
 parser.add_argument('-r', '--transpose', help='Output file name for transpose table step, default is tranposedTable.txt', default='transposedTable.txt')
 parser.add_argument('--fdr', help='Optional. Choose fdr value for significance, default is 0.1',default=0.1)
 parser.add_argument('--pval', help='Optional. Choose p-value for significant, default is 0.05',default=0.05)
-parser.add_argument('-s', '--significanceOutput', help = 'the output from the R script, filtered for significant pval and fdr' , default = 'filterOutput.txt')
+parser.add_argument('-s', '--significanceOutput', help = 'the output from the R script, filtered for significant pval and fdr' , default = 'significanceOutput.txt')
 
 args = parser.parse_args()
 
@@ -41,7 +43,6 @@ def prelimCheck():
 	else:
 		print(colors.FAIL + 'ERROR: R script not found, is it in your current working directory?' + colors.ENDC)
 
-prelimCheck()
 
 def tableCheck():
 	global cleanedTable
@@ -65,7 +66,6 @@ def tableCheck():
 
 	print(colors.RUN + "Table checking complete. Collapsed OTU table written to: %s..." % args.collapsedOut + colors.ENDC)
 
-tableCheck()
 
 def transpose(cleanedTable): #the input to this function should be Allie's cleaned table
 	global transposedTable
@@ -73,13 +73,12 @@ def transpose(cleanedTable): #the input to this function should be Allie's clean
 	transposedTable.to_csv(args.transpose, sep='\t',)
 	print(colors.RUN + "Table transposed. Written to %s..." % args.transpose + colors.ENDC)
 
-transpose(cleanedTable)
 
 def merging():
 	global metadataHeaders
 	print(colors.RUN + 'Merging %s and %s...' % (args.metadata, args.transpose) + colors.ENDC)
 	with open(args.metadata, 'r') as m:
-		metadataHeaders = m.readline()
+		metadataHeaders = list(m.readline().split())[1:]
 	metaDF = pd.read_csv(args.metadata, sep='\t')
 	taxaDF = pd.read_csv(args.transpose, sep = '\t')
 	mergedDF = pd.merge(metaDF, taxaDF, left_index = True, right_index = True, how = 'inner') ## merge the metadata and transposed files using the first header in each file as the criteria
@@ -88,14 +87,17 @@ def merging():
 	mergedDF.columns = [x.strip().replace('#', '') for x in mergedDF.columns] #remove hash symbol	
 	mergedDF.to_csv(args.mergedOut, sep = '\t', index = False)
 	
-merging()
-print(metadataHeaders)
 def Rcomp():
-	print(colors.RUN + 'Comparing groups, split by %s..' % args.categoryName + colors.ENDC)
-	subprocess.call(args=['Rscript Compare.R %s %s %s' %(args.mergedOut, args.categoryName, args.compareOut)], shell=True)
-	print(colors.COMPLETE + 'Complete! Output written to %s' % args.compareOut + colors.ENDC)
+	if args.categoryName:
+		print(colors.RUN + 'Comparing groups, split by %s..' % args.categoryName + colors.ENDC)
+		subprocess.call(args=['Rscript Compare.R %s %s %s' %(args.mergedOut, args.categoryName, args.compareOut)], shell=True)
+		print(colors.COMPLETE + 'Complete! Output written to %s' % args.compareOut + colors.ENDC)
+	else:
+		for category in metadataHeaders:
+			print(colors.RUN + 'Comparing groups, split by %s..' % category + colors.ENDC)
+			subprocess.call(args=['Rscript Compare.R %s %s %s' %(args.mergedOut, category, category + "compared.txt")], shell=True)
+			print(colors.COMPLETE + 'Complete! Output written to %s' % (category + "compared.txt") + colors.ENDC)	
 	
-Rcomp()
 
 def filterR():
 	df =  pd.read_csv(args.compareOut, sep = '\t')
@@ -104,12 +106,14 @@ def filterR():
 	newDF = df.ix[(df['pval']<=userPval) & (df['fdr']<=userFDR)]
 	newDF.to_csv(args.significanceOutput, sep = '\t', index = False)
 
+
+prelimCheck()
+tableCheck()
+transpose(cleanedTable)
+merging()
+Rcomp()
 filterR()
 
 
-
-__author__ = "Richard Hagan, David Jacobson, and Allison Mann, Krithivasan Sankaranarayanan"
-__license__ = "GPL"
-__version__ = "1.0"
 
 
